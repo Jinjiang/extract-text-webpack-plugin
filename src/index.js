@@ -77,10 +77,28 @@ class ExtractTextPlugin {
 
   renderExtractedChunk(chunk) {
     const source = new ConcatSource();
+    // https://github.com/vuejs/vue-loader/issues/808
+    // The modules are listed component by component. We need to re-group them
+    // by the "dummy" css source, which is the mark of the last style of a
+    // component, and reverse the component order.
+    let currentComponent = [];
+    const reorderedSource = [currentComponent];
     chunk.forEachModule((module) => {
-      const moduleSource = module.source();
-      source.add(this.applyAdditionalInformation(moduleSource, module.additionalInformation));
+      // The mark of the last style of a component
+      const isLastStyleOfComponent = module.source().source().match(/^html\{😂:0\}/);
+      if (isLastStyleOfComponent) {
+        currentComponent = [];
+        reorderedSource.unshift(currentComponent);
+      } else {
+        currentComponent.push(module);
+      }
     }, this);
+    reorderedSource.forEach(
+      componentSource => componentSource.forEach((module) => {
+        const moduleSource = module.source();
+        source.add(this.applyAdditionalInformation(moduleSource, module.additionalInformation));
+      }),
+    );
     return source;
   }
 
